@@ -1,5 +1,5 @@
 # Use the official Golang image as the builder
-FROM golang:1.20.3-alpine as builder
+FROM golang:1.22.4-alpine as builder
 
 # Enable CGO to use C libraries (set to 0 to disable it)
 # We set it to 0 to build a fully static binary for our final image
@@ -7,6 +7,10 @@ ENV CGO_ENABLED=0
 
 # Set the working directory
 WORKDIR /app
+
+# update CA certificates
+RUN apk update && apk upgrade && apk add --no-cache ca-certificates
+RUN update-ca-certificates
 
 # Copy the Go Modules manifests (go.mod and go.sum files)
 COPY go.mod go.sum ./
@@ -18,26 +22,22 @@ RUN go mod download
 COPY . .
 
 # Build the Go application and output the binary to /app/ChatGPT-Proxy-V4
-RUN go build -o /app/gpt .
+RUN go build -o /app/ChatGPT-To-API .
 
-FROM alpine:latest
+# Use a scratch image as the final distroless image
+FROM scratch
 
+# Set the working directory
 WORKDIR /app
 
 # Copy CA certificates from the builder stage
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY --from=builder /app/gpt /app/gpt
-COPY ./docker-entrypoint.sh /app/docker-entrypoint.sh
+# Copy the built Go binary from the builder stage
+COPY --from=builder /app/ChatGPT-To-API /bin/ChatGPT-To-API
 
-ARG TZ="Asia/Shanghai"
-ENV TZ ${TZ}
-
-RUN apk add --no-cache bash tzdata \
-    && ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime \
-    && echo ${TZ} > /etc/timezone \
-    && chmod +x /app/docker-entrypoint.sh
-
+# Expose the port where the application is running
 EXPOSE 8080
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Start the application
+CMD [ "/bin/ChatGPT-To-API" ]
