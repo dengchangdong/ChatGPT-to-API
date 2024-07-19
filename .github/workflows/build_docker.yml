@@ -1,8 +1,16 @@
-name: build_docker
+name: Docker build and push
 
 on:
-  release:
-    types: [created] # 表示在创建新的 Release 时触发
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build from"
+        required: false
+        default: 'main'
+      image_tag:
+        description: "Image tag"
+        required: false
+        default: 'latest'
 
 jobs:
   build_docker:
